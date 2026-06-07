@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工事情報検索システム</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="data.js" onerror="window.KOUJI_DATA=null"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Meiryo', 'Yu Gothic', sans-serif; background: #f0f2f5; color: #333; }
+
+  header {
+    background: linear-gradient(135deg, #1a3c5e, #2d6a9f);
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  header h1 { font-size: 20px; font-weight: bold; }
+  header .badge {
+    background: #f0a500;
+    color: #333;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  /* ファイル読み込み */
+  .file-zone {
+    background: white;
+    border: 2px dashed #2d6a9f;
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 20px;
+  }
+  .file-zone:hover, .file-zone.drag-over { background: #e8f0fe; border-color: #1a3c5e; }
+  .file-zone .icon { font-size: 40px; margin-bottom: 8px; }
+  .file-zone p { color: #666; font-size: 14px; margin-top: 4px; }
+  .file-zone strong { color: #2d6a9f; font-size: 16px; }
+  #fileInput { display: none; }
+
+  .file-loaded {
+    background: #e8f5e9;
+    border: 2px solid #4caf50;
+    border-radius: 12px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .file-loaded .info { display: flex; align-items: center; gap: 10px; }
+  .file-loaded .filename { font-weight: bold; color: #2e7d32; }
+  .file-loaded .count { color: #555; font-size: 13px; }
+  .btn-reload {
+    background: #2d6a9f; color: white; border: none;
+    padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  .btn-reload:hover { background: #1a3c5e; }
+
+  /* 検索バー */
+  .search-bar {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .search-input-wrap {
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+  }
+  .search-input-wrap input {
+    width: 100%;
+    padding: 10px 14px 10px 38px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  .search-input-wrap input:focus { border-color: #2d6a9f; }
+  .search-input-wrap .search-icon {
+    position: absolute; left: 12px; top: 50%;
+    transform: translateY(-50%); color: #999; font-size: 16px;
+  }
+
+  .filter-group { display: flex; gap: 6px; }
+  .filter-btn {
+    padding: 8px 16px; border: 2px solid #ddd; border-radius: 20px;
+    background: white; cursor: pointer; font-size: 13px; font-family: inherit;
+    transition: all 0.2s;
+  }
+  .filter-btn.active { border-color: #2d6a9f; background: #2d6a9f; color: white; }
+  .filter-btn:hover:not(.active) { border-color: #aaa; }
+
+  .search-stats { font-size: 13px; color: #666; white-space: nowrap; }
+
+  /* シート選択 */
+  .sheet-selector {
+    background: white;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .sheet-selector label { color: #555; white-space: nowrap; }
+  .sheet-selector select {
+    padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
+    font-family: inherit; font-size: 14px; outline: none;
+  }
+
+  /* コピー設定パネル */
+  .copy-panel {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .copy-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .copy-panel-header h3 { font-size: 14px; color: #555; font-weight: bold; }
+  .copy-panel-toggle {
+    font-size: 12px; color: #2d6a9f; cursor: pointer; text-decoration: underline;
+  }
+  .copy-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .copy-field-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .copy-field-label:hover { border-color: #2d6a9f; }
+  .copy-field-label input[type=checkbox] { display: none; }
+  .copy-field-label.checked {
+    background: #e8f0fe;
+    border-color: #2d6a9f;
+    color: #1a3c5e;
+    font-weight: bold;
+  }
+  .copy-format {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+  .copy-format label { color: #555; }
+  .copy-format select {
+    padding: 4px 8px; border: 1px solid #ddd; border-radius: 6px;
+    font-family: inherit; font-size: 13px; outline: none;
+  }
+
+  /* テーブル */
+  .table-wrap {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 700px; }
+  thead tr { background: #1a3c5e; color: white; }
+  thead th {
+    padding: 12px 14px;
+    text-align: left;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  thead th:hover { background: #2d6a9f; }
+  thead th .sort-icon { margin-left: 4px; opacity: 0.6; }
+  tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: #f5f8ff; }
+  tbody tr.selected { background: #d0e4ff !important; }
+  tbody td { padding: 11px 14px; font-size: 14px; }
+  tbody td .status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+  .status-active { background: #e8f5e9; color: #2e7d32; }
+  .status-past { background: #f5f5f5; color: #777; }
+
+  .no-data {
+    text-align: center;
+    padding: 60px 20px;
+    color: #aaa;
+  }
+  .no-data .icon { font-size: 48px; margin-bottom: 12px; }
+  .no-data p { font-size: 15px; }
+
+  /* コピーボタンエリア */
+  .copy-action {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    z-index: 100;
+  }
+  .copy-preview {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 12px;
+    max-width: 320px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    line-height: 1.8;
+    word-break: break-all;
+    display: none;
+  }
+  .copy-preview.show { display: block; }
+  .copy-preview .preview-title {
+    font-size: 11px; color: #999; margin-bottom: 6px; font-weight: bold;
+  }
+  .btn-copy-main {
+    background: #f0a500;
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(240,165,0,0.4);
+    transition: all 0.2s;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-copy-main:hover { background: #d4910a; transform: translateY(-1px); }
+  .btn-copy-main:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; transform: none; }
+  .btn-copy-main.copied { background: #4caf50; }
+
+  .selected-info {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: #555;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  /* トースト */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: #333;
+    color: white;
+    padding: 10px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    z-index: 9999;
+    transition: transform 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { background: #4caf50; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>🏗️</div>
+  <h1>工事情報検索システム</h1>
+  <div class="badge">建設管理</div>
+</header>
+
+<div class="container">
+
+  <!-- ファイル読み込みエリア -->
+  <div class="file-zone" id="fileZone" onclick="document.getElementById('fileInput').click()">
+    <div class="icon">📂</div>
+    <strong>Excelファイルをここにドロップ、またはクリックして選択</strong>
+    <p>.xlsx / .xls に対応 ／ Dropbox・OneDriveのフォルダから直接選択できます</p>
+  </div>
+  <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+
+  <div class="file-loaded" id="fileLoaded" style="display:none">
+    <div class="info">
+      <span>📊</span>
+      <div>
+        <div class="filename" id="loadedFileName"></div>
+        <div class="count" id="loadedCount"></div>
+      </div>
+    </div>
+    <button class="btn-reload" onclick="document.getElementById('fileInput').click()">別のファイルを読み込む</button>
+  </div>
+
+  <!-- シート選択 -->
+  <div class="sheet-selector" id="sheetSelector" style="display:none">
+    <label>📋 シート選択：</label>
+    <select id="sheetSelect" onchange="loadSheet()"></select>
+  </div>
+
+  <!-- 検索バー -->
+  <div class="search-bar" id="searchBar" style="display:none">
+    <div class="search-input-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="工事名・発注者・場所などで検索..." oninput="applyFilters()">
+    </div>
+    <div class="filter-group">
+      <button class="filter-btn active" data-status="all" onclick="setStatusFilter(this)">すべて</button>
+      <button class="filter-btn" data-status="active" onclick="setStatusFilter(this)">稼働中</button>
+      <button class="filter-btn" data-status="past" onclick="setStatusFilter(this)">過去</button>
+    </div>
+    <div class="search-stats" id="searchStats"></div>
+  </div>
+
+  <!-- コピー設定 -->
+  <div class="copy-panel" id="copyPanel" style="display:none">
+    <div class="copy-panel-header">
+      <h3>📋 コピーする項目を選択</h3>
+      <span class="copy-panel-toggle" onclick="toggleAllFields()">すべて選択/解除</span>
+    </div>
+    <div class="copy-fields" id="copyFields"></div>
+    <div class="copy-format">
+      <label>区切り文字：</label>
+      <select id="separatorSelect" onchange="updateCopyPreview()">
+        <option value="\n">改行（縦並び）</option>
+        <option value="　">全角スペース</option>
+        <option value="／">スラッシュ</option>
+        <option value="、">読点</option>
+        <option value="\t">タブ</option>
+      </select>
+      <label style="margin-left:12px">形式：</label>
+      <select id="formatSelect" onchange="updateCopyPreview()">
+        <option value="value">値のみ</option>
+        <option value="label_value">項目名：値</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- テーブル -->
+  <div class="table-wrap" id="tableWrap" style="display:none">
+    <div class="table-scroll">
+      <table id="dataTable">
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="no-data" id="noData" style="display:none">
+      <div class="icon">🔍</div>
+      <p>該当する工事が見つかりませんでした</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- コピーアクション（右下固定） -->
+<div class="copy-action" id="copyAction" style="display:none">
+  <div class="selected-info" id="selectedInfo"></div>
+  <div class="copy-preview" id="copyPreview">
+    <div class="preview-title">コピー内容プレビュー</div>
+    <div id="copyPreviewText"></div>
+  </div>
+  <button class="btn-copy-main" id="btnCopy" onclick="doCopy()">
+    📋 コピー
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let allData = [];
+let filteredData = [];
+let selectedRow = null;
+let currentHeaders = [];
+let workbook = null;
+let statusFilter = 'all';
+let sortCol = -1;
+let sortAsc = true;
+
+// ステータス列の候補キーワード
+const STATUS_KEYWORDS = ['状態', 'ステータス', '稼働', '完了', '進捗', '状況'];
+const ACTIVE_KEYWORDS = ['稼働中', '進行中', '施工中', '工事中', '未完', '○', '◯', '●'];
+const PAST_KEYWORDS = ['完了', '終了', '竣工', '過去', '×', '▲'];
+
+// --- ファイル読み込み ---
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+const fileZone = document.getElementById('fileZone');
+fileZone.addEventListener('dragover', e => { e.preventDefault(); fileZone.classList.add('drag-over'); });
+fileZone.addEventListener('dragleave', () => fileZone.classList.remove('drag-over'));
+fileZone.addEventListener('drop', e => {
+  e.preventDefault();
+  fileZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      if (file.name.endsWith('.csv')) {
+        const text = e.target.result;
+        workbook = XLSX.read(text, { type: 'string' });
+      } else {
+        workbook = XLSX.read(e.target.result, { type: 'array' });
+      }
+      const sheetNames = workbook.SheetNames;
+      const sheetSel = document.getElementById('sheetSelect');
+      sheetSel.innerHTML = sheetNames.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+      document.getElementById('sheetSelector').style.display = sheetNames.length > 1 ? 'flex' : 'none';
+      document.getElementById('loadedFileName').textContent = file.name;
+      document.getElementById('fileZone').style.display = 'none';
+      document.getElementById('fileLoaded').style.display = 'flex';
+      loadSheet();
+    } catch(err) {
+      showToast('ファイルの読み込みに失敗しました: ' + err.message, false);
+    }
+  };
+  if (file.name.endsWith('.csv')) {
+    reader.readAsText(file, 'UTF-8');
+  } else {
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function loadSheet() {
+  const sheetName = document.getElementById('sheetSelect').value;
+  const sheet = workbook.Sheets[sheetName];
+  const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  if (json.length < 2) { showToast('データが見つかりませんでした', false); return; }
+
+  // ヘッダー行検出（最初の空でない行）
+  let headerRowIdx = 0;
+  for (let i = 0; i < Math.min(5, json.length); i++) {
+    if (json[i].some(c => c !== '')) { headerRowIdx = i; break; }
+  }
+  currentHeaders = json[headerRowIdx].map(h => String(h).trim()).filter(h => h !== '');
+  const dataRows = json.slice(headerRowIdx + 1).filter(r => r.some(c => c !== ''));
+
+  allData = dataRows.map((row, idx) => {
+    const obj = { _id: idx };
+    currentHeaders.forEach((h, i) => { obj[h] = row[i] !== undefined ? String(row[i]).trim() : ''; });
+    return obj;
+  });
+
+  document.getElementById('loadedCount').textContent = `${allData.length} 件のデータを読み込みました`;
+  buildCopyFields();
+  document.getElementById('searchBar').style.display = 'flex';
+  document.getElementById('copyPanel').style.display = 'block';
+  document.getElementById('tableWrap').style.display = 'block';
+  selectedRow = null;
+  document.getElementById('copyAction').style.display = 'none';
+  applyFilters();
+}
+
+// --- ステータス判定 ---
+function getStatus(row) {
+  const statusCol = currentHeaders.find(h => STATUS_KEYWORDS.some(k => h.includes(k)));
+  if (!statusCol) return 'unknown';
+  const val = String(row[statusCol] || '');
+  if (ACTIVE_KEYWORDS.some(k => val.includes(k))) return 'active';
+  if (PAST_KEYWORDS.some(k => val.includes(k))) return 'past';
+  return 'unknown';
+}
+
+// --- フィルター・検索 ---
+function setStatusFilter(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  statusFilter = btn.dataset.status;
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  filteredData = allData.filter(row => {
+    const matchQ = !q || currentHeaders.some(h => String(row[h]).toLowerCase().includes(q));
+    const status = getStatus(row);
+    const matchStatus = statusFilter === 'all' || status === statusFilter || (statusFilter !== 'active' && statusFilter !== 'past' && status === 'unknown');
+    return matchQ && matchStatus;
+  });
+  document.getElementById('searchStats').textContent = `${filteredData.length} / ${allData.length} 件`;
+  renderTable();
+}
+
+// --- テーブル描画 ---
+function buildTableHead() {
+  const thead = document.getElementById('tableHead');
+  thead.innerHTML = '<tr>' + currentHeaders.map((h, i) =>
+    `<th onclick="sortBy(${i})">${escHtml(h)} <span class="sort-icon">${sortCol===i?(sortAsc?'▲':'▼'):'⇅'}</span></th>`
+  ).join('') + '</tr>';
+}
+
+function renderTable() {
+  buildTableHead();
+  const tbody = document.getElementById('tableBody');
+  const noData = document.getElementById('noData');
+
+  if (filteredData.length === 0) {
+    tbody.innerHTML = '';
+    noData.style.display = 'block';
+    return;
+  }
+  noData.style.display = 'none';
+
+  let rows = [...filteredData];
+  if (sortCol >= 0 && sortCol < currentHeaders.length) {
+    const h = currentHeaders[sortCol];
+    rows.sort((a, b) => {
+      const va = a[h], vb = b[h];
+      const na = parseFloat(va), nb = parseFloat(vb);
+      if (!isNaN(na) && !isNaN(nb)) return sortAsc ? na - nb : nb - na;
+      return sortAsc ? va.localeCompare(vb, 'ja') : vb.localeCompare(va, 'ja');
+    });
+  }
+
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  tbody.innerHTML = rows.map(row => {
+    const isSelected = selectedRow && selectedRow._id === row._id;
+    const status = getStatus(row);
+    const cells = currentHeaders.map(h => {
+      let val = escHtml(row[h]);
+      if (q) {
+        const re = new RegExp(`(${escRegex(q)})`, 'gi');
+        val = val.replace(re, '<mark style="background:#fff3cd">$1</mark>');
+      }
+      if (STATUS_KEYWORDS.some(k => h.includes(k))) {
+        const badge = status === 'active'
+          ? `<span class="status-badge status-active">稼働中</span>`
+          : status === 'past'
+            ? `<span class="status-badge status-past">完了</span>`
+            : `<span>${val}</span>`;
+        return `<td>${badge}</td>`;
+      }
+      return `<td>${val}</td>`;
+    }).join('');
+    return `<tr class="${isSelected?'selected':''}" data-id="${row._id}" onclick="selectRow(${row._id})">${cells}</tr>`;
+  }).join('');
+}
+
+function sortBy(colIdx) {
+  if (sortCol === colIdx) sortAsc = !sortAsc;
+  else { sortCol = colIdx; sortAsc = true; }
+  renderTable();
+}
+
+function selectRow(id) {
+  selectedRow = allData.find(r => r._id === id) || null;
+  renderTable();
+  updateCopyAction();
+}
+
+// --- コピーフィールド ---
+function buildCopyFields() {
+  const container = document.getElementById('copyFields');
+  container.innerHTML = currentHeaders.map(h =>
+    `<label class="copy-field-label checked" data-field="${escHtml(h)}">
+      <input type="checkbox" checked onchange="onFieldChange(this)"> ${escHtml(h)}
+    </label>`
+  ).join('');
+}
+
+function onFieldChange(cb) {
+  const label = cb.closest('.copy-field-label');
+  label.classList.toggle('checked', cb.checked);
+  updateCopyPreview();
+}
+
+function toggleAllFields() {
+  const labels = document.querySelectorAll('.copy-field-label');
+  const anyUnchecked = [...labels].some(l => !l.querySelector('input').checked);
+  labels.forEach(l => {
+    l.querySelector('input').checked = anyUnchecked;
+    l.classList.toggle('checked', anyUnchecked);
+  });
+  updateCopyPreview();
+}
+
+function getSelectedFields() {
+  return [...document.querySelectorAll('.copy-field-label')]
+    .filter(l => l.querySelector('input').checked)
+    .map(l => l.dataset.field);
+}
+
+function buildCopyText(row) {
+  const fields = getSelectedFields();
+  const sep = document.getElementById('separatorSelect').value.replace('\\n', '\n').replace('\\t', '\t');
+  const fmt = document.getElementById('formatSelect').value;
+  return fields.map(f => {
+    const val = row[f] || '';
+    return fmt === 'label_value' ? `${f}：${val}` : val;
+  }).join(sep);
+}
+
+function updateCopyPreview() {
+  if (!selectedRow) return;
+  const text = buildCopyText(selectedRow);
+  document.getElementById('copyPreviewText').textContent = text;
+  document.getElementById('copyPreview').classList.add('show');
+}
+
+function updateCopyAction() {
+  const action = document.getElementById('copyAction');
+  if (!selectedRow) {
+    action.style.display = 'none';
+    return;
+  }
+  action.style.display = 'flex';
+  // 選択行の代表情報
+  const nameCol = currentHeaders.find(h => h.includes('名') || h.includes('件名')) || currentHeaders[0];
+  document.getElementById('selectedInfo').textContent = `選択中：${selectedRow[nameCol] || '（行 ' + (selectedRow._id + 1) + '）'}`;
+  updateCopyPreview();
+}
+
+function doCopy() {
+  if (!selectedRow) return;
+  const text = buildCopyText(selectedRow);
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('btnCopy');
+    btn.textContent = '✅ コピーしました！';
+    btn.classList.add('copied');
+    showToast('クリップボードにコピーしました', true);
+    setTimeout(() => {
+      btn.innerHTML = '📋 コピー';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('コピーしました', true);
+  });
+}
+
+// --- ユーティリティ ---
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function showToast(msg, success=true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (success ? ' success' : '');
+  setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+
+// セパレータのエスケープ解決
+document.getElementById('separatorSelect').addEventListener('change', updateCopyPreview);
+document.getElementById('formatSelect').addEventListener('change', updateCopyPreview);
+
+// --- data.js による自動読み込み ---
+function autoLoadFromDataJs() {
+  if (!window.KOUJI_DATA) return;
+  try {
+    const sheetNames = Object.keys(window.KOUJI_DATA);
+    if (sheetNames.length === 0) return;
+
+    const sheetSel = document.getElementById('sheetSelect');
+    sheetSel.innerHTML = sheetNames.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+    document.getElementById('sheetSelector').style.display = sheetNames.length > 1 ? 'flex' : 'none';
+
+    document.getElementById('fileZone').style.display = 'none';
+    document.getElementById('fileLoaded').style.display = 'flex';
+    document.getElementById('loadedFileName').textContent = '自動読み込み済み（データ更新.bat で生成）';
+    document.getElementById('fileLoaded').style.background = '#e3f2fd';
+    document.getElementById('fileLoaded').style.borderColor = '#2d6a9f';
+
+    loadSheetFromDataJs(sheetNames[0]);
+    sheetSel.onchange = () => loadSheetFromDataJs(sheetSel.value);
+  } catch(e) {
+    console.warn('data.js 自動読み込み失敗:', e);
+  }
+}
+
+function loadSheetFromDataJs(sheetName) {
+  const sheet = window.KOUJI_DATA[sheetName];
+  if (!sheet) return;
+  currentHeaders = sheet.headers;
+  allData = sheet.rows.map((row, idx) => Object.assign({ _id: idx }, row));
+  const updateTime = window.KOUJI_UPDATE_TIME || '不明';
+  document.getElementById('loadedCount').textContent = `最終更新: ${updateTime} ／ ${allData.length} 件`;
+  buildCopyFields();
+  document.getElementById('searchBar').style.display = 'flex';
+  document.getElementById('copyPanel').style.display = 'block';
+  document.getElementById('tableWrap').style.display = 'block';
+  selectedRow = null;
+  document.getElementById('copyAction').style.display = 'none';
+  workbook = null;
+  applyFilters();
+}
+
+window.addEventListener('DOMContentLoaded', autoLoadFromDataJs);
+</script>
+</body>
+</html>
