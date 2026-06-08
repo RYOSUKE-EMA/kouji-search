@@ -30,35 +30,21 @@ jobs:
       - name: Staticryptをインストール
         run: npm install -g staticrypt
 
-      - name: data.jsをindex.htmlにインライン化
-        run: |
-          node -e "
-            const fs = require('fs');
-            let html = fs.readFileSync('index.html', 'utf8');
-            const data = fs.readFileSync('data.js', 'utf8');
-            html = html.replace(
-              /<script src=\"data\.js\"[^>]*><\/script>/,
-              '<script>' + data + '</script>'
-            );
-            fs.writeFileSync('index_with_data.html', html, 'utf8');
-            console.log('インライン化完了');
-          "
-
-      - name: パスワード保護をかける
+      - name: index.htmlにパスワード保護をかける（data.jsは別ファイルのまま）
         env:
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
         run: |
-          staticrypt index_with_data.html \
+          staticrypt index.html \
             --password "$SITE_PASSWORD" \
             --directory encrypted \
             --short
           echo "Staticrypt完了"
-          ls -la encrypted/
 
       - name: 公開フォルダを準備
         run: |
           mkdir -p public
-          cp encrypted/index_with_data.html public/index.html
+          cp encrypted/index.html public/index.html
+          cp data.js public/data.js
           echo "公開フォルダ準備完了"
           ls -la public/
 
