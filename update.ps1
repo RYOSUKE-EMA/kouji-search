@@ -76,7 +76,7 @@ if (-not (Test-Path $kintoneTokenPath)) {
 
     try {
         # まず総件数を取得
-        $query = [System.Uri]::EscapeDataString('mkuSYmd = "" and mbuBumon like "建築"')
+        $query = [System.Uri]::EscapeDataString('mkuSYmd = "" and mbuBumon like "建築" order by $id asc')
         $countUrl = "${baseUrl}?app=${kintoneAppId}&limit=1&totalCount=true&query=${query}&${fieldParams}"
         $req = [System.Net.WebRequest]::Create($countUrl)
         $req.Method = 'GET'
