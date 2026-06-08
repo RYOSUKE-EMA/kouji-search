@@ -601,8 +601,8 @@ function selectRow(id) {
 function buildCopyFields() {
   const container = document.getElementById('copyFields');
   container.innerHTML = currentHeaders.map(h =>
-    `<label class="copy-field-label checked" data-field="${escHtml(h)}">
-      <input type="checkbox" checked onchange="onFieldChange(this)"> ${escHtml(h)}
+    `<label class="copy-field-label" data-field="${escHtml(h)}">
+      <input type="checkbox" onchange="onFieldChange(this)"> ${escHtml(h)}
     </label>`
   ).join('');
 }
