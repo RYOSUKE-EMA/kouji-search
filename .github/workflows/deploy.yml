@@ -25,16 +25,24 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
 
       - name: Staticryptをインストール
         run: npm install -g staticrypt
 
-      - name: data.jsをindex.htmlにインライン埋め込み
+      - name: data.jsをindex.htmlにインライン化
         run: |
-          # data.jsの内容をindex.htmlの<script src="data.js">より前に挿入
-          DATA_CONTENT=$(cat data.js)
-          sed "s|<script src=\"data.js\"[^>]*></script>|<script>${DATA_CONTENT}</script>|" index.html > index_with_data.html
+          node -e "
+            const fs = require('fs');
+            let html = fs.readFileSync('index.html', 'utf8');
+            const data = fs.readFileSync('data.js', 'utf8');
+            html = html.replace(
+              /<script src=\"data\.js\"[^>]*><\/script>/,
+              '<script>' + data + '</script>'
+            );
+            fs.writeFileSync('index_with_data.html', html, 'utf8');
+            console.log('インライン化完了');
+          "
 
       - name: パスワード保護をかける
         env:
@@ -43,16 +51,16 @@ jobs:
           staticrypt index_with_data.html \
             --password "$SITE_PASSWORD" \
             --output index_protected.html \
-            --template-title "工事情報検索システム" \
-            --template-instructions "パスワードを入力してください" \
-            --template-color-primary "#1a3c5e" \
-            --template-color-secondary "#2d6a9f" \
             --short
+          echo "Staticrypt完了"
+          ls -la index_protected.html
 
       - name: 公開フォルダを準備
         run: |
           mkdir -p public
           cp index_protected.html public/index.html
+          echo "公開フォルダ準備完了"
+          ls -la public/
 
       - uses: actions/configure-pages@v5
 
