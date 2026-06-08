@@ -50,15 +50,15 @@ jobs:
         run: |
           staticrypt index_with_data.html \
             --password "$SITE_PASSWORD" \
-            --output index_protected.html \
+            --directory encrypted \
             --short
           echo "Staticrypt完了"
-          ls -la index_protected.html
+          ls -la encrypted/
 
       - name: 公開フォルダを準備
         run: |
           mkdir -p public
-          cp index_protected.html public/index.html
+          cp encrypted/index_with_data.html public/index.html
           echo "公開フォルダ準備完了"
           ls -la public/
 
