@@ -454,6 +454,7 @@ function loadFile(file) {
       const sheetNames = workbook.SheetNames;
       const sheetSel = document.getElementById('sheetSelect');
       sheetSel.innerHTML = sheetNames.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+      sheetSel.onchange = loadSheet; // data.js自動読み込み後に手動読み込みした場合、ハンドラを戻す
       document.getElementById('sheetSelector').style.display = sheetNames.length > 1 ? 'flex' : 'none';
       document.getElementById('loadedFileName').textContent = file.name;
       document.getElementById('fileZone').style.display = 'none';
@@ -502,6 +503,9 @@ function loadSheet() {
 
 // --- ステータス判定 ---
 function getStatus(row) {
+  // データ更新.bat(update.ps1)が全行に付与する _status を最優先で使う
+  if (row._status === '稼働中') return 'active';
+  if (row._status === '過去') return 'past';
   const statusCol = currentHeaders.find(h => STATUS_KEYWORDS.some(k => h.includes(k)));
   if (!statusCol) return 'unknown';
   const val = String(row[statusCol] || '');
@@ -728,7 +732,16 @@ function loadSheetFromDataJs(sheetName) {
   const sheet = window.KOUJI_DATA[sheetName];
   if (!sheet) return;
   currentHeaders = sheet.headers;
-  allData = sheet.rows.map((row, idx) => Object.assign({ _id: idx }, row));
+  // kintone行とExcel行で持っている列が異なるため、欠けている列は '' に正規化する
+  // （セルの undefined 表示と、ソート時の localeCompare エラーを防ぐ）
+  allData = sheet.rows.map((row, idx) => {
+    const obj = { _id: idx, _status: row._status || '', _source: row._source || '' };
+    currentHeaders.forEach(h => {
+      const v = row[h];
+      obj[h] = (v === undefined || v === null) ? '' : String(v);
+    });
+    return obj;
+  });
   const updateTime = window.KOUJI_UPDATE_TIME || '不明';
   document.getElementById('loadedCount').textContent = `最終更新: ${updateTime} ／ ${allData.length} 件`;
   buildCopyFields();

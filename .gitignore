@@ -1,0 +1,4 @@
+# APIトークン・ローカル設定は絶対にコミットしない（このリポジトリは公開GitHub Pages）
+kintone_token.txt
+config.txt
+データ更新＆公開.bat
