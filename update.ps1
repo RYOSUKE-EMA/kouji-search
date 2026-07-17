@@ -183,4 +183,4 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host 'Pushed to GitHub' -ForegroundColor Green
 Write-Host ''; Write-Host 'Done! ~1 minute to reflect.' -ForegroundColor Green
-Write-Host 'URL: https://ryosuke-ema.github.io/kouji-search/'
+Write-Host 'URL: https://kouji-search.vercel.app/'
