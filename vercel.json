@@ -1,0 +1,5 @@
+{
+  "buildCommand": "npm install -g staticrypt && staticrypt index.html --password $SITE_PASSWORD --directory encrypted --short && mkdir -p public && cp encrypted/index.html public/index.html && cp data.js public/data.js",
+  "outputDirectory": "public",
+  "installCommand": "echo skip"
+}
